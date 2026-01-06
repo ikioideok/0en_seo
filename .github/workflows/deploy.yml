@@ -1,0 +1,35 @@
+name: Deploy LP to Sakura
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist via SFTP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SAKURA_HOST }}
+          username: ${{ secrets.SAKURA_USER }}
+          password: ${{ secrets.SAKURA_PASSWORD }}
+          port: ${{ secrets.SAKURA_PORT }}
+          source: "dist/*"
+          target: ${{ secrets.SAKURA_PATH }}
+          strip_components: 1
