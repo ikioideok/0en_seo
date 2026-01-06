@@ -14,9 +14,11 @@ interface Message {
     timestamp: Date;
 }
 
+const socketUrl =
+    import.meta.env.VITE_CHAT_SOCKET_URL ||
+    (import.meta.env.DEV ? 'http://localhost:3001' : '');
 // Generate random ID for this session
 const userId = 'user_' + Math.random().toString(36).substr(2, 9);
-const socket: Socket = io('http://localhost:3001');
 
 export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
     const [messages, setMessages] = useState<Message[]>([
@@ -32,6 +34,7 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
     const [showAgentName, setShowAgentName] = useState(false);
     const hasGreeted = useRef(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const socketRef = useRef<Socket | null>(null);
 
     // Simulate typing and greeting on open
     // Simulate typing and greeting on open
@@ -86,7 +89,7 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
         };
 
         runGreetingSequence();
-    }, [isOpen]);
+    }, [isOpen, socketUrl]);
 
     const playNotificationSound = () => {
         try {
@@ -119,18 +122,12 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
     };
 
     useEffect(() => {
-        if (isOpen) {
-            scrollToBottom();
-            // Ensure we join room when opening, if connected
-            if (socket.connected) {
-                socket.emit('join_room', { room: userId });
-            }
-        }
-    }, [messages, isOpen, isTyping]);
+        if (!isOpen || !socketUrl) return;
 
-    useEffect(() => {
+        const socket = socketRef.current ?? io(socketUrl);
+        socketRef.current = socket;
+
         function onConnect() {
-            console.log("ChatWidget connected");
             socket.emit('join_room', { room: userId });
         }
 
@@ -154,7 +151,16 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
             socket.off('connect', onConnect);
             socket.off('receive_message');
         };
-    }, []);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        scrollToBottom();
+        const socket = socketRef.current;
+        if (socket?.connected) {
+            socket.emit('join_room', { room: userId });
+        }
+    }, [messages, isOpen, isTyping]);
 
     const handleSendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -170,6 +176,9 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
         setMessages(prev => [...prev, userMsg]);
         setInputValue('');
 
+        const socket = socketRef.current;
+        if (!socket) return;
+
         // Send to server
         socket.emit('send_message', {
             room: 'admin',
@@ -179,7 +188,7 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
         });
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !socketUrl) return null;
 
     return (
         <div className="fixed bottom-24 right-4 md:right-8 z-[60] w-[90vw] md:w-[400px] h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-200 animate-in slide-in-from-bottom-10 fade-in duration-300">

@@ -24,6 +24,7 @@ export default function LandingPage() {
 
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const chatEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_CHAT === "true";
 
   useEffect(() => {
     const existingScript = document.getElementById("timerex_embed");
@@ -1086,28 +1087,26 @@ export default function LandingPage() {
       </div >
 
       {/* Chat Floating Button */}
-      {
-        !isChatOpen && (
-          <a
-            href="#"
-            className="fixed bottom-24 md:bottom-8 right-4 md:right-8 z-50 animate-fade-in group"
-            onClick={(e) => {
-              e.preventDefault();
-              setIsChatOpen(true);
-            }}
-          >
-            <div className="bg-white text-blue-600 border border-blue-100 shadow-[0_4px_20px_rgba(0,0,0,0.15)] rounded-full px-6 py-4 flex items-center gap-3 hover:-translate-y-1 hover:shadow-[0_8px_25px_rgba(0,0,0,0.2)] transition-all">
-              <div className="bg-blue-100 p-2 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                <MessageCircle className="w-6 h-6" />
-              </div>
-              <span className="font-bold text-base tracking-wide">今すぐチャットで相談してみる</span>
+      {chatEnabled && !isChatOpen && (
+        <a
+          href="#"
+          className="fixed bottom-24 md:bottom-8 right-4 md:right-8 z-50 animate-fade-in group"
+          onClick={(e) => {
+            e.preventDefault();
+            setIsChatOpen(true);
+          }}
+        >
+          <div className="bg-white text-blue-600 border border-blue-100 shadow-[0_4px_20px_rgba(0,0,0,0.15)] rounded-full px-6 py-4 flex items-center gap-3 hover:-translate-y-1 hover:shadow-[0_8px_25px_rgba(0,0,0,0.2)] transition-all">
+            <div className="bg-blue-100 p-2 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <MessageCircle className="w-6 h-6" />
             </div>
-          </a>
-        )
-      }
+            <span className="font-bold text-base tracking-wide">今すぐチャットで相談してみる</span>
+          </div>
+        </a>
+      )}
 
       {/* Chat Widget */}
-      <ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      {chatEnabled && <ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />}
     </div >
   );
 }

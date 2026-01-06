@@ -15,7 +15,9 @@ interface Message {
     timestamp: Date;
 }
 
-const socket: Socket = io('http://127.0.0.1:3001');
+const socketUrl =
+    import.meta.env.VITE_CHAT_SOCKET_URL ||
+    (import.meta.env.DEV ? 'http://127.0.0.1:3001' : '');
 
 export default function AdminChat() {
     const [activeChats, setActiveChats] = useState<ChatSession[]>([]);
@@ -23,8 +25,9 @@ export default function AdminChat() {
     const [messages, setMessages] = useState<Record<string, Message[]>>({});
     const [inputValue, setInputValue] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const socketRef = useRef<Socket | null>(null);
 
-    const [isConnected, setIsConnected] = useState(socket.connected);
+    const [isConnected, setIsConnected] = useState(false);
 
     const [activeTab, setActiveTab] = useState<'chat' | 'calendar'>('chat');
     const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
@@ -38,6 +41,11 @@ export default function AdminChat() {
         if (Notification.permission !== "granted") {
             Notification.requestPermission();
         }
+
+        if (!socketUrl) return;
+
+        const socket = socketRef.current ?? io(socketUrl);
+        socketRef.current = socket;
 
         function onConnect() {
             setIsConnected(true);
@@ -123,6 +131,9 @@ export default function AdminChat() {
             timestamp: new Date()
         };
 
+        const socket = socketRef.current;
+        if (!socket) return;
+
         // Emit to server
         socket.emit('send_message', {
             to: selectedUserId,
@@ -166,6 +177,8 @@ export default function AdminChat() {
     const toggleDateBlock = (date: Date) => {
         const dateStr = getLocalYYYYMMDD(date);
         console.log('👆 Toggling date (Clicked):', dateStr);
+        const socket = socketRef.current;
+        if (!socket) return;
         socket.emit('toggle_blocked_date', dateStr);
     };
 
@@ -205,7 +218,10 @@ export default function AdminChat() {
                                     key={chat.userId}
                                     onClick={() => {
                                         setSelectedUserId(chat.userId);
-                                        socket.emit('fetch_history', chat.userId);
+                                        const socket = socketRef.current;
+                                        if (socket) {
+                                            socket.emit('fetch_history', chat.userId);
+                                        }
                                     }}
                                     className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedUserId === chat.userId ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}
                                 >
@@ -342,5 +358,3 @@ export default function AdminChat() {
         </div>
     );
 }
-
-
