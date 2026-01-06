@@ -62,12 +62,13 @@ function handlePoll(userId) {
     // ヘッダー除外
     const dataRows = rows.slice(1);
 
+    // このユーザー宛のメッセージ
     const messages = dataRows
-        .filter(row => row[1] === userId && row[2] === 'bot')
+        .filter(row => row[1] === userId)
         .map(row => ({
             id: row[0].getTime().toString(),
             timestamp: row[0],
-            sender: 'bot',
+            sender: row[2], // bot or user
             text: row[3]
         }));
 
