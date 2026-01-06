@@ -24,6 +24,7 @@ jobs:
         run: npm run build
         env:
           VITE_GAS_API_URL: ${{ secrets.VITE_GAS_API_URL }}
+          VITE_ENABLE_CHAT: ${{ secrets.VITE_ENABLE_CHAT }}
 
       - name: Upload dist via SFTP
         uses: appleboy/scp-action@v0.1.7
