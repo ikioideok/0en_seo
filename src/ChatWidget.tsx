@@ -30,22 +30,31 @@ const getUserId = () => {
 const userId = getUserId();
 
 export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
-    const [messages, setMessages] = useState<Message[]>([
-        {
+    // Greeting state
+    const hasGreetedKey = `has_greeted_${userId}`;
+    const initialHasGreeted = sessionStorage.getItem(hasGreetedKey) === 'true';
+    const hasGreeted = useRef(initialHasGreeted);
+
+    const [messages, setMessages] = useState<Message[]>(() => {
+        if (initialHasGreeted) {
+            return [{
+                id: 'g3',
+                text: 'なにかお困りでしょうか？どのようなことでも構いませんので、お気軽にご相談くださいませ。',
+                sender: 'bot',
+                timestamp: new Date()
+            }];
+        }
+        return [{
             id: 'welcome',
             text: 'ただいま担当者にお繋ぎしています',
             sender: 'bot',
             timestamp: new Date()
-        }
-    ]);
+        }];
+    });
     const [inputValue, setInputValue] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const [showAgentName, setShowAgentName] = useState(false);
+    const [showAgentName, setShowAgentName] = useState(initialHasGreeted);
     const [isSending, setIsSending] = useState(false);
-
-    // Greeting state
-    const hasGreetedKey = `has_greeted_${userId}`;
-    const hasGreeted = useRef(sessionStorage.getItem(hasGreetedKey) === 'true');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const pollingInterval = useRef<NodeJS.Timeout | null>(null);
@@ -53,7 +62,8 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
     // Initial Greeting Sequence
     useEffect(() => {
         const runGreetingSequence = async () => {
-            if (isOpen && !hasGreeted.current && messages.length <= 1) {
+            // Only run if not greeted yet AND we still have the welcome message
+            if (isOpen && !hasGreeted.current && messages.some(m => m.id === 'welcome')) {
                 hasGreeted.current = true;
                 sessionStorage.setItem(hasGreetedKey, 'true');
 
