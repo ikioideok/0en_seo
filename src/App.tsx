@@ -25,6 +25,7 @@ export default function LandingPage() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const chatEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_CHAT === "true";
+  const baseUrl = import.meta.env.BASE_URL;
 
   useEffect(() => {
     const existingScript = document.getElementById("timerex_embed");
@@ -80,7 +81,7 @@ export default function LandingPage() {
 
         <div className="w-full text-center relative z-10">
           <img
-            src="/hero_main.png"
+            src={`${baseUrl}hero_main.png`}
             alt="0円SEO - 成果が出なければ費用を請求しない全額返金型SEO"
             className="w-full h-auto mx-auto relative z-0"
           />
@@ -232,7 +233,7 @@ export default function LandingPage() {
       <section className="mt-24 relative z-20 w-full bg-white">
         <div className="container mx-auto px-4 max-w-7xl">
           <img
-            src="/solution_final.png"
+            src={`${baseUrl}solution_final.png`}
             alt="当社のSEO対策は完全成果報酬"
             className="w-full h-auto"
           />
@@ -611,8 +612,8 @@ export default function LandingPage() {
                 </div>
                 <div className="md:w-1/2 order-1 md:order-2">
                   <div className="rounded-xl shadow-xl overflow-hidden border border-slate-200">
-                    <img
-                      src="/copernicus_terminal.png"
+                      <img
+                        src={`${baseUrl}copernicus_terminal.png`}
                       alt="Copernicus Engine v3.2"
                       className="w-full h-auto"
                     />
@@ -642,7 +643,7 @@ export default function LandingPage() {
                     <div className="pt-2">
                       <div className="w-full aspect-[4/3] rounded-lg bg-slate-200 overflow-hidden mb-6 relative">
                         <img
-                          src="/representative.jpg"
+                          src={`${baseUrl}representative.jpg`}
                           alt="水間 雄紀"
                           className="w-full h-full object-cover object-[center_35%]"
                         />
@@ -775,7 +776,7 @@ export default function LandingPage() {
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden group">
               <div className="aspect-video w-full overflow-hidden bg-slate-100 relative">
                 <img
-                  src="/case1.jpg"
+                  src={`${baseUrl}case1.jpg`}
                   alt="Case Study 1"
                   className="w-full h-full object-cover object-[center_40%] transform transition-transform duration-500 group-hover:scale-105"
                 />
@@ -797,7 +798,7 @@ export default function LandingPage() {
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden group">
               <div className="aspect-video w-full overflow-hidden bg-slate-100 relative">
                 <img
-                  src="/case2.png"
+                  src={`${baseUrl}case2.png`}
                   alt="Case Study 2"
                   className="w-full h-full object-cover transform transition-transform duration-500 group-hover:scale-105"
                 />
