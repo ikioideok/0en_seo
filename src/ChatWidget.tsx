@@ -116,7 +116,6 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
                 if (!response.ok) return;
 
                 const data = await response.json();
-                const data = await response.json();
                 if (data.messages && Array.isArray(data.messages)) {
                     // Filter out already displayed messages
                     const newMessages = data.messages.filter((m: any) =>
@@ -135,11 +134,7 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
                             sessionStorage.setItem(hasGreetedKey, 'true');
                             hasGreeted.current = true;
                             setShowAgentName(true);
-                            setMessages(prev => {
-                                const initial = prev.filter(p => p.id === 'welcome'); // Keep welcome if we want, or remove it
-                                // Actually, if we have history, remove welcome
-                                return [...newMessages];
-                            });
+                            setMessages(() => [...newMessages]);
                         } else {
                             // New real-time message
                             playNotificationSound();
@@ -147,15 +142,9 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
                         }
                     }
                 }
-
-                if (newMessages.length > 0) {
-                    playNotificationSound();
-                    setMessages(prev => [...prev, ...newMessages]);
-                }
-            }
             } catch (error) {
-            console.error('Polling error:', error);
-        }
+                console.error('Polling error:', error);
+            }
     };
 
     // Poll every 5 seconds
