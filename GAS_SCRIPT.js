@@ -163,6 +163,9 @@ function getAdminHtml() {
 
     // 初期化
     window.onload = function() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
       fetchData();
       setInterval(fetchData, POLLING_INTERVAL);
     };
@@ -187,11 +190,15 @@ function getAdminHtml() {
   
   <!-- 修正: google.script.run 用のスクリプト -->
   <script>
+    const NOTIFY_KEY = 'chat_admin_last_notified_ts';
+    const INIT_KEY = 'chat_admin_init_done';
+
     function render(responseJson) {
       const data = JSON.parse(responseJson);
       if (!data.messages) return;
       
       allMessages = data.messages;
+      maybeNotify(allMessages);
       updateUserList();
       if (currentUserId) {
         renderMessages(currentUserId);
@@ -292,6 +299,33 @@ function getAdminHtml() {
 
     function formatTime(d) {
         return \`\${d.getHours()}:\${d.getMinutes().toString().padStart(2, '0')}\`;
+    }
+
+    function maybeNotify(messages) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      const latestUserMsg = messages
+        .filter(m => m.sender === 'user')
+        .map(m => ({ ts: new Date(m.timestamp).getTime(), text: m.text, userId: m.userId }))
+        .sort((a, b) => b.ts - a.ts)[0];
+
+      if (!latestUserMsg) return;
+
+      const lastNotified = Number(localStorage.getItem(NOTIFY_KEY) || '0');
+      const initialized = localStorage.getItem(INIT_KEY) === 'true';
+
+      if (!initialized) {
+        localStorage.setItem(NOTIFY_KEY, String(latestUserMsg.ts));
+        localStorage.setItem(INIT_KEY, 'true');
+        return;
+      }
+
+      if (latestUserMsg.ts > lastNotified) {
+        localStorage.setItem(NOTIFY_KEY, String(latestUserMsg.ts));
+        new Notification('新しいチャット', {
+          body: latestUserMsg.text,
+          tag: 'chat-new-message'
+        });
+      }
     }
   </script>
 </body>
