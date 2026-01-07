@@ -125,34 +125,39 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
                         timestamp: new Date(m.timestamp)
                     }));
 
-                    // Deduplicate: Filter out messages that we already have
-                    // We check for ID match OR (Content match AND Time proximity)
-                    // This handles the case where we sent a message (local ID) and it comes back from server (server ID)
-                    const newMessages = fetchedMessages.filter((fetched: any) => {
-                        return !messages.some(existing => {
-                            const idMatch = existing.id === fetched.id;
-                            const textMatch = existing.text === fetched.text;
-                            const senderMatch = existing.sender === fetched.sender;
-                            // If text and sender match, and time is within 60 seconds, treat as same message (deduplicate)
-                            const timeDiff = Math.abs(existing.timestamp.getTime() - fetched.timestamp.getTime());
-                            const fuzzyMatch = textMatch && senderMatch && timeDiff < 60000;
+                    if (fetchedMessages.length > 0) {
+                        setMessages(currentMessages => {
+                            // If it's the very first load (and we have history), replace initial state
+                            // currentMessages.length <= 1 means we only have the 'welcome' or 'greeting' messages
+                            if (currentMessages.length <= 1 && currentMessages.some(m => m.id === 'welcome')) {
+                                // First load logic
+                                sessionStorage.setItem(hasGreetedKey, 'true');
+                                hasGreeted.current = true;
+                                setShowAgentName(true);
+                                return [...fetchedMessages];
+                            }
 
-                            return idMatch || fuzzyMatch;
-                        });
-                    });
+                            // Deduplication against current, fresh state
+                            const trulyNewMessages = fetchedMessages.filter((fetched: any) => {
+                                return !currentMessages.some(existing => {
+                                    const idMatch = existing.id === fetched.id;
+                                    const textMatch = existing.text === fetched.text;
+                                    const senderMatch = existing.sender === fetched.sender;
+                                    // If text and sender match, and time is within 60 seconds...
+                                    const timeDiff = Math.abs(existing.timestamp.getTime() - fetched.timestamp.getTime());
+                                    const fuzzyMatch = textMatch && senderMatch && timeDiff < 60000;
 
-                    if (newMessages.length > 0) {
-                        if (messages.length <= 1) {
-                            // First load (history found)
-                            sessionStorage.setItem(hasGreetedKey, 'true');
-                            hasGreeted.current = true;
-                            setShowAgentName(true);
-                            setMessages(() => [...fetchedMessages]); // Use fetchedMessages to ensure we have server IDs
-                        } else {
-                            // New real-time message
+                                    return idMatch || fuzzyMatch;
+                                });
+                            });
+
+                            if (trulyNewMessages.length === 0) {
+                                return currentMessages;
+                            }
+
                             playNotificationSound();
-                            setMessages(prev => [...prev, ...newMessages]);
-                        }
+                            return [...currentMessages, ...trulyNewMessages];
+                        });
                     }
                 }
             } catch (error) {
@@ -169,7 +174,7 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
         return () => {
             if (pollingInterval.current) clearInterval(pollingInterval.current);
         };
-    }, [isOpen, messages]);
+    }, [isOpen]);
 
     const playNotificationSound = () => {
         try {

@@ -39,11 +39,6 @@ function doPost(e) {
         return handleAdminReply(data);
     }
 
-    // 管理画面からのデータ取得用
-    if (action === 'admin_poll') {
-        return handleAdminPoll();
-    }
-
     return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -51,6 +46,7 @@ function doPost(e) {
 function handleSend(data) {
     const sheet = getSheet();
     const timestamp = new Date();
+    // 管理者からの返信として書き込む (Sender = 'bot')
     sheet.appendRow([timestamp, data.userId, data.sender, data.text, 'unread']);
     return ContentService.createTextOutput(JSON.stringify({ status: 'sent' })).setMimeType(ContentService.MimeType.JSON);
 }
@@ -84,23 +80,6 @@ function handleAdminReply(data) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'sent' })).setMimeType(ContentService.MimeType.JSON);
 }
 
-// 管理画面への全データ配信
-function handleAdminPoll() {
-    const sheet = getSheet();
-    const rows = sheet.getDataRange().getValues();
-    const dataRows = rows.slice(1);
-
-    // 全データを返す（クライアント側でグルーピング）
-    const messages = dataRows.map(row => ({
-        timestamp: row[0],
-        userId: row[1],
-        sender: row[2],
-        text: row[3]
-    }));
-
-    return ContentService.createTextOutput(JSON.stringify({ messages: messages })).setMimeType(ContentService.MimeType.JSON);
-}
-
 function getSheet() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('chat_logs');
@@ -132,13 +111,13 @@ function getAdminHtml() {
     <div class="p-4 border-b border-gray-200 bg-slate-800 text-white font-bold flex justify-between items-center">
         <span>チャット一覧</span>
         <div class="flex gap-2">
-            <button onclick="requestNotifyPermission()" class="text-xs bg-blue-600 px-2 py-1 rounded hover:bg-blue-500">🔔通知ON</button>
             <button onclick="fetchData()" class="text-xs bg-slate-600 px-2 py-1 rounded hover:bg-slate-500">更新</button>
         </div>
     </div>
     <div id="user-list" class="flex-1 overflow-y-auto">
       <!-- User List will be here -->
     </div>
+    <div id="status-bar" class="p-2 text-xs text-gray-400 border-t bg-gray-50">State: Init</div>
   </div>
 
   <!-- Main Chat Area -->
@@ -163,52 +142,82 @@ function getAdminHtml() {
     let allMessages = [];
     let currentUserId = null;
     const POLLING_INTERVAL = 5000;
+    const KEY_INIT_DONE = 'chat_init_done';
+    const KEY_LAST_NOTIFIED_TS = 'chat_last_notified_ts';
 
     // 初期化
+    window.onload = function() {
       fetchData();
       setInterval(fetchData, POLLING_INTERVAL);
     };
 
-    function requestNotifyPermission() {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          alert('通知が許可されました');
-        }
-      });
+    function playNotificationSound() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+        osc.type = 'sine';
+        
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.5);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+      } catch (e) {
+        console.error('Audio play failed', e);
+      }
     }
 
     function fetchData() {
-      google.script.run.withSuccessHandler(render).withFailureHandler(console.error).getAdminPollData();
+      document.getElementById('status-bar').textContent = 'Loading...';
+      google.script.run.withSuccessHandler(render).withFailureHandler((err) => {
+        document.getElementById('status-bar').textContent = 'Error: ' + err.message;
+        console.error(err);
+      }).getAdminPollData();
     }
 
-    // サーバーサイドのdoPostをハックして使う（GASのClient APIだとdoPostを直接呼べないため、fetchで呼ぶ手もあるが、google.script.runを使う場合は関数を分けるのが定石。今回は簡易化のためfetchを使う）
-    // 訂正: google.script.run はサーバー側の関数を直接呼べます。doPostではなく専用関数を作るべきでしたが、上記のGASコードには handleAdminPoll があるのでそれを呼びます。
-    // コード修正: google.script.run で呼ぶために、サーバー側に露出させる関数が必要です。
-    // 現状のGAS構造だと doPost 経由がメインなので、fetchで自分自身にPOSTするのが実は一番早いです。
-    
-    // しかし、GASのHTML内から自分自身のWeb App URLを知るのは難しいので、
-    // ここはサーバー側スクリプトに「露出用関数」を追加するのがベストですが、
-    // コードを極力単純にするため、fetchDataを「自分自身のURL」に対して行いたいところです。
-    // ただURLがわからないので、サーバー側でスクリプトプロパティやテンプレート埋め込みが必要。
-    
-    // 今回は一番確実な「google.script.run」でサーバー関数を呼ぶ方式に変えます。
-    // doPoll という関数をサーバー側に追加せずに済ませるため、doPostを使わず、専用のブリッジ関数を下に書きます。
-  </script>
-  
-  <!-- 修正: google.script.run 用のスクリプト -->
-  <script>
-    const NOTIFY_KEY = 'chat_admin_last_notified_ts';
-    const INIT_KEY = 'chat_admin_init_done';
-
     function render(responseJson) {
-      const data = JSON.parse(responseJson);
-      if (!data.messages) return;
+      if (!responseJson) {
+         document.getElementById('status-bar').textContent = 'Error: Empty response';
+         return;
+      }
+      let data;
+      try {
+        data = JSON.parse(responseJson);
+      } catch (e) {
+        document.getElementById('status-bar').textContent = 'Error: JSON Parse';
+        return;
+      }
+      
+      if (!data.messages) {
+        document.getElementById('status-bar').textContent = 'No messages field';
+        return;
+      }
       
       allMessages = data.messages;
-      maybeNotify(allMessages);
-      updateUserList();
-      if (currentUserId) {
-        renderMessages(currentUserId);
+      document.getElementById('status-bar').textContent = 'Loaded ' + allMessages.length + ' msgs';
+      
+      try {
+        maybeNotify(allMessages);
+      } catch (e) {
+        console.error('Notify Error:', e);
+      }
+      
+      try {
+        updateUserList();
+        if (currentUserId) {
+          renderMessages(currentUserId);
+        }
+      } catch (e) {
+        document.getElementById('status-bar').textContent = 'Render Error: ' + e.message;
       }
     }
 
@@ -219,7 +228,7 @@ function getAdminHtml() {
           users[msg.userId] = {
             lastMsg: msg.text,
             lastTime: new Date(msg.timestamp),
-            unread: msg.sender === 'user' // 簡易判定: 最新がユーザーなら未読...ではないが、まあこれでも
+            unread: msg.sender === 'user' 
           };
         }
         // 時間更新
@@ -300,38 +309,43 @@ function getAdminHtml() {
 
         // 送信
         const req = JSON.stringify(payload);
-        // google.script.runはdoPostを直接呼べない（引数がObjectになる）ので、ブリッジ関数を呼ぶ
         google.script.run.withSuccessHandler(() => console.log('sent')).processAdminRaw(req);
     }
 
     function formatTime(d) {
-        return \`\${d.getHours()}:\${d.getMinutes().toString().padStart(2, '0')}\`;
+        return d.getHours() + ':' + d.getMinutes().toString().padStart(2, '0');
     }
 
     function maybeNotify(messages) {
-      if (!('Notification' in window) || Notification.permission !== 'granted') return;
-      const latestUserMsg = messages
-        .filter(m => (m.sender || '').toLowerCase() === 'user')
-        .map(m => ({ ts: new Date(m.timestamp).getTime(), text: m.text, userId: m.userId }))
-        .sort((a, b) => b.ts - a.ts)[0];
-
-      if (!latestUserMsg) return;
-
-      const lastNotified = Number(localStorage.getItem(NOTIFY_KEY) || '0');
-      const initialized = localStorage.getItem(INIT_KEY) === 'true';
-
-      if (!initialized) {
-        localStorage.setItem(NOTIFY_KEY, String(latestUserMsg.ts));
-        localStorage.setItem(INIT_KEY, 'true');
+      // まだ一度もロードしていないなら通知しない
+      var isInitialLoad = !localStorage.getItem(KEY_INIT_DONE);
+      
+      // 未読管理
+      var userMsgs = messages.filter(function(m) { return m.sender.toLowerCase() !== 'me'; });
+      if (userMsgs.length === 0) {
+        if (!localStorage.getItem(KEY_INIT_DONE)) localStorage.setItem(KEY_INIT_DONE, 'true');
         return;
       }
 
-      if (latestUserMsg.ts > lastNotified) {
-        localStorage.setItem(NOTIFY_KEY, String(latestUserMsg.ts));
-        new Notification('新しいチャット', {
-          body: latestUserMsg.text,
-          tag: 'chat-new-message'
-        });
+      var lastMsg = userMsgs[userMsgs.length - 1];
+      var lastNotifiedVal = localStorage.getItem(KEY_LAST_NOTIFIED_TS);
+      var lastNotifiedTs = lastNotifiedVal ? parseInt(lastNotifiedVal, 10) : 0;
+
+      // 新着判定
+      var hasNewMessage = lastMsg.timestamp > lastNotifiedTs;
+
+      if (!localStorage.getItem(KEY_INIT_DONE)) {
+        localStorage.setItem(KEY_INIT_DONE, 'true');
+        localStorage.setItem(KEY_LAST_NOTIFIED_TS, lastMsg.timestamp);
+        return;
+      }
+
+      if (hasNewMessage) {
+         // シンプルな音だけ鳴らす
+         playNotificationSound();
+         
+         // 直近通知時刻を更新
+         localStorage.setItem(KEY_LAST_NOTIFIED_TS, lastMsg.timestamp);
       }
     }
   </script>
@@ -340,31 +354,22 @@ function getAdminHtml() {
   `;
 }
 
-// ブリッジ関数: クライアント側JSから呼ばれる
+// ブリッジ関数
 function processAdminRaw(jsonString) {
-    // doPostと同じ処理に流す
     const e = { postData: { contents: jsonString } };
     return doPost(e).getContent();
 }
 
-// データの読み出しもブリッジ経由で
 function getAdminPollData() {
-    return handleAdminPoll().getContent();
-}
-
-// polling用の上書き
-function doGet(e) {
-    const params = e.parameter;
-    if (params && params.action === 'poll') {
-        return handlePoll(params.userId);
-    }
-    return HtmlService.createHtmlOutput(getAdminHtml())
-        .setTitle('チャット管理画面')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-}
-
-// フロントからのデータ取得用（上書きで追加）
-function fetchData() {
-    // クライアント側JSのfetchDataから呼ばれるのはgoogle.script.run.getAdminPollData()に書き換える必要がある
-    // なので上のscriptタグ内を修正します
+    // 既存のhandleAdminPollからデータを取得するための簡易ブリッジ（関数自体は残しておいて中身を直接実装でもよいが、既存流用で）
+    const sheet = getSheet();
+    const rows = sheet.getDataRange().getValues();
+    const dataRows = rows.slice(1);
+    const messages = dataRows.map(row => ({
+        timestamp: row[0],
+        userId: row[1],
+        sender: row[2],
+        text: row[3]
+    }));
+    return JSON.stringify({ messages: messages });
 }
