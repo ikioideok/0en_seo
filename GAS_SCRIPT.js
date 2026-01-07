@@ -131,7 +131,10 @@ function getAdminHtml() {
   <div class="w-full md:w-1/4 bg-white border-r border-gray-200 flex flex-col h-1/3 md:h-full">
     <div class="p-4 border-b border-gray-200 bg-slate-800 text-white font-bold flex justify-between items-center">
         <span>チャット一覧</span>
-        <button onclick="fetchData()" class="text-xs bg-slate-600 px-2 py-1 rounded hover:bg-slate-500">更新</button>
+        <div class="flex gap-2">
+            <button onclick="requestNotifyPermission()" class="text-xs bg-blue-600 px-2 py-1 rounded hover:bg-blue-500">🔔通知ON</button>
+            <button onclick="fetchData()" class="text-xs bg-slate-600 px-2 py-1 rounded hover:bg-slate-500">更新</button>
+        </div>
     </div>
     <div id="user-list" class="flex-1 overflow-y-auto">
       <!-- User List will be here -->
@@ -162,13 +165,17 @@ function getAdminHtml() {
     const POLLING_INTERVAL = 5000;
 
     // 初期化
-    window.onload = function() {
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
       fetchData();
       setInterval(fetchData, POLLING_INTERVAL);
     };
+
+    function requestNotifyPermission() {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          alert('通知が許可されました');
+        }
+      });
+    }
 
     function fetchData() {
       google.script.run.withSuccessHandler(render).withFailureHandler(console.error).getAdminPollData();
@@ -304,7 +311,7 @@ function getAdminHtml() {
     function maybeNotify(messages) {
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
       const latestUserMsg = messages
-        .filter(m => m.sender === 'user')
+        .filter(m => (m.sender || '').toLowerCase() === 'user')
         .map(m => ({ ts: new Date(m.timestamp).getTime(), text: m.text, userId: m.userId }))
         .sort((a, b) => b.ts - a.ts)[0];
 
