@@ -865,7 +865,7 @@ export default function LandingPage() {
                   <>
                     <p className="mb-4">
                       お預かりしたデポジットは<span className="font-bold text-slate-900 text-lg mx-1">全額返金</span>されます。<br />
-                      さらに、制作済みの記事資産（最大30本）の著作権は御社に譲渡し、返還や削除は求めません。
+                      さらに、制作済みの記事の著作権は御社に譲渡し、返還や削除は求めません。
                     </p>
                     <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm font-bold text-blue-900">
                       つまり、「お金を払ったのに何も残らない」という事態は100%起きません。
