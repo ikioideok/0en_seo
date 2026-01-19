@@ -703,7 +703,7 @@ export default function LandingPage() {
               <div>
                 <h3 className="text-xl font-bold text-slate-900 mb-2">契約・入金</h3>
                 <p className="text-slate-600 leading-relaxed text-sm">
-                  クラウドサインにて契約し、指定の口座にご入金いただきます。
+                  契約し、指定の口座にご入金いただきます。
                 </p>
               </div>
             </div>
